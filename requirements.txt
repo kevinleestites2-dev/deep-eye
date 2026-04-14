@@ -12,7 +12,8 @@ mistralai>=1.0.0
 
 # Async Support
 aiohttp>=3.9.0
-asyncio>=3.4.3
+# Note: asyncio is part of the Python standard library since 3.4.
+# The PyPI backport package is deprecated and unnecessary on Python 3.8+.
 
 # Web Crawling & Parsing
 selenium>=4.15.0
