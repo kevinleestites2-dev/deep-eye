@@ -52,6 +52,15 @@ ai_providers:
     max_tokens: 2000
     timeout: 30
 
+  # Gemini (Google)
+  gemini:
+    enabled: true
+    api_key: "your-gemini-api-key-here"
+    model: "gemini-1.5-flash"
+    temperature: 0.7
+    max_tokens: 2000
+    timeout: 30
+
   # LM Studio (Local LLM)
   lmstudio:
     enabled: true
