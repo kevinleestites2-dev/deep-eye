@@ -87,6 +87,15 @@ class AIProviderManager:
             except Exception as e:
                 logger.warning(f"Failed to initialize Gemini provider: {e}")
 
+        # Groq
+        if ai_config.get('groq', {}).get('enabled', False):
+            try:
+                from ai_providers.groq_provider import GroqProvider
+                self.providers['groq'] = GroqProvider(ai_config['groq'])
+                logger.info("Groq provider initialized")
+            except Exception as e:
+                logger.warning(f"Failed to initialize Groq provider: {e}")
+
         # LM Studio
         if ai_config.get('lmstudio', {}).get('enabled', False):
             try:
