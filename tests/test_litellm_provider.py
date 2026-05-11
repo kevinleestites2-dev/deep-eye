@@ -3,6 +3,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 
 class TestLiteLLMProviderInit:
     def test_default_model(self):
@@ -91,6 +93,70 @@ class TestLiteLLMProviderGenerate:
         kwargs = mock_litellm.completion.call_args.kwargs
         assert kwargs["model"] == "anthropic/claude-haiku-4-5"
         assert kwargs["temperature"] == 0.2
+
+
+class TestLiteLLMProviderEdgeCases:
+    @patch("ai_providers.litellm_provider.litellm")
+    def test_raises_on_api_error(self, mock_litellm):
+        mock_litellm.completion.side_effect = Exception("401 Unauthorized")
+
+        from ai_providers.litellm_provider import LiteLLMProvider
+
+        p = LiteLLMProvider({"api_key": "bad-key"})
+        with pytest.raises(Exception, match="401"):
+            p.generate("hello")
+
+    @patch("ai_providers.litellm_provider.litellm")
+    def test_returns_none_content_gracefully(self, mock_litellm):
+        mock_msg = MagicMock(content=None)
+        mock_litellm.completion.return_value = MagicMock(
+            choices=[MagicMock(message=mock_msg)]
+        )
+
+        from ai_providers.litellm_provider import LiteLLMProvider
+
+        p = LiteLLMProvider({"api_key": "sk-test"})
+        result = p.generate("hello")
+        assert result is None
+
+    @patch("ai_providers.litellm_provider.litellm")
+    def test_provider_manager_can_load_litellm(self, mock_litellm):
+        from ai_providers.provider_manager import AIProviderManager
+
+        config = {
+            "ai_providers": {
+                "litellm": {
+                    "enabled": True,
+                    "api_key": "sk-test",
+                    "model": "openai/gpt-4o",
+                }
+            }
+        }
+        manager = AIProviderManager(config)
+        assert "litellm" in manager.get_available_providers()
+
+    @patch("ai_providers.litellm_provider.litellm")
+    def test_provider_manager_generate_routes_to_litellm(self, mock_litellm):
+        mock_msg = MagicMock(content="manager response")
+        mock_litellm.completion.return_value = MagicMock(
+            choices=[MagicMock(message=mock_msg)]
+        )
+
+        from ai_providers.provider_manager import AIProviderManager
+
+        config = {
+            "ai_providers": {
+                "litellm": {
+                    "enabled": True,
+                    "api_key": "sk-test",
+                    "model": "openai/gpt-4o",
+                }
+            }
+        }
+        manager = AIProviderManager(config)
+        manager.set_provider("litellm")
+        result = manager.generate("test prompt")
+        assert result == "manager response"
 
 
 class TestRegistration:
