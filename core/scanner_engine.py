@@ -564,6 +564,24 @@ class ScannerEngine:
             except Exception as e:
                 logger.error(f"Compliance enrichment failed: {e}")
 
+        # AI Triage (Group C) — runs AFTER RAG/compliance, BEFORE bounty writer
+        try:
+            from modules.ai_triage import AITriage, BountyWriter
+            triage = AITriage(self.ai_manager, self.config)
+            if triage.is_enabled():
+                triage.triage_vulnerabilities(self.vulnerabilities)
+                # Re-sync results vulnerabilities list (FPs may have been dropped)
+                results['vulnerabilities'] = self.vulnerabilities
+                results['severity_summary'] = self._calculate_severity_summary()
+                logger.info("AI triage applied")
+
+            bounty = BountyWriter(self.ai_manager, self.config)
+            if bounty.is_enabled():
+                bounty.generate_reports(self.vulnerabilities)
+                logger.info("Bounty reports generated")
+        except Exception as e:
+            logger.error(f"AI triage / bounty writer failed: {e}")
+
         # Add pentest state information
         results['pentest_state'] = self.state_manager.get_state_dict()
         

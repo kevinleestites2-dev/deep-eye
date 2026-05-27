@@ -340,6 +340,21 @@ rag:
   auto_rebuild: true  # Rebuild index when CVE DB updated
   top_k: 5  # Max hits per query
   min_score: 0.15  # Cosine similarity threshold
+
+# AI Auto-Triage / FP Reduction (Group C)
+ai_triage:
+  enabled: false  # Use AI to score confidence and flag false positives
+  drop_false_positives: false  # If true, drop FPs with confidence >= drop_threshold
+  drop_threshold: 0.8  # Minimum AI confidence to drop a finding
+  min_severity: "high"  # Triage only high/critical to save tokens
+
+# Bug Bounty Report Writer (Group C)
+bug_bounty:
+  enabled: false  # Generate Markdown bug bounty reports per critical/high finding
+  format: "hackerone"  # hackerone | bugcrowd | generic
+  min_severity: "high"  # Only generate for findings at or above this severity
+  output_directory: "reports/bounty"
+  one_file_per_vuln: true
   
   # Report sections
   include_sections:
