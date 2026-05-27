@@ -105,6 +105,28 @@ Note: All scan options are configured in config.yaml
         help='Comma-separated report formats (e.g. junit,csv,xlsx). Overrides config.'
     )
 
+    parser.add_argument(
+        '--diff',
+        nargs=2,
+        metavar=('BASELINE', 'CURRENT'),
+        help='Diff two scan JSON files instead of running a scan'
+    )
+
+    parser.add_argument(
+        '--diff-output',
+        type=str,
+        default=None,
+        help='Output path for diff report (default: reports/diff_<timestamp>.<ext>)'
+    )
+
+    parser.add_argument(
+        '--diff-format',
+        type=str,
+        choices=['html', 'json', 'csv'],
+        default='html',
+        help='Diff report format (default: html)'
+    )
+
     return parser.parse_args()
 
 
@@ -141,16 +163,65 @@ def validate_config(config: Dict, target_url: str) -> bool:
     return True
 
 
+def _run_diff_mode(args) -> int:
+    """Run scan diff between two JSON files. Returns exit code."""
+    from core.scan_diff import diff_scans, load_scan_json
+    from utils.exports.diff_renderer import render_html, render_json, render_csv
+    from datetime import datetime
+
+    baseline_path, current_path = args.diff
+    try:
+        baseline = load_scan_json(baseline_path)
+        current = load_scan_json(current_path)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        console.print(f"[bold red]Error:[/bold red] Failed to load scan JSON: {e}")
+        return 2
+
+    diff = diff_scans(baseline, current)
+    summary = diff.get("summary", {})
+
+    # Resolve output path
+    output_path = args.diff_output
+    if not output_path:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        Path("reports").mkdir(parents=True, exist_ok=True)
+        ext = {"html": "html", "json": "json", "csv": "csv"}[args.diff_format]
+        output_path = f"reports/diff_{timestamp}.{ext}"
+
+    fmt = args.diff_format
+    if fmt == "html":
+        render_html(diff, output_path)
+    elif fmt == "json":
+        render_json(diff, output_path)
+    elif fmt == "csv":
+        render_csv(diff, output_path)
+
+    console.print(f"\n[bold cyan]Scan Diff Summary[/bold cyan]")
+    console.print(f"  Baseline: {baseline_path} ({diff['baseline']['vuln_count']} vulns)")
+    console.print(f"  Current:  {current_path} ({diff['current']['vuln_count']} vulns)")
+    console.print(f"  [bold red]New:[/bold red] {summary.get('new', 0)}")
+    console.print(f"  [bold green]Fixed:[/bold green] {summary.get('fixed', 0)}")
+    console.print(f"  [bold yellow]Severity Changed:[/bold yellow] {summary.get('severity_changed', 0)}")
+    console.print(f"  Unchanged: {summary.get('unchanged', 0)}")
+    console.print(f"  Net Delta: {summary.get('net_delta', 0)}")
+    console.print(f"\n[bold green]✓[/bold green] Diff report saved to: {output_path}")
+    return 0
+
+
 def main():
     """Main execution function."""
     try:
         # Parse arguments
         args = parse_arguments()
-        
+
         # Display banner
         if not args.no_banner:
             display_banner()
-        
+
+        # Diff mode: skip scan, run diff between two JSON files
+        if args.diff:
+            return _run_diff_mode(args)
+
         # Load configuration
         console.print("[bold blue]Loading configuration...[/bold blue]")
         config = ConfigLoader.load(args.config)
