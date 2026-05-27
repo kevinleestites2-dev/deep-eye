@@ -88,7 +88,7 @@ Note: All scan options are configured in config.yaml
     parser.add_argument(
         '--version',
         action='version',
-        version='Deep Eye v1.3.0 (Hestia)',
+        version='Deep Eye v1.4.0 (Hanzou)',
         help='Show version and exit'
     )
     
