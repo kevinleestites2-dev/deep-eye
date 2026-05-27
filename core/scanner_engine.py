@@ -519,7 +519,20 @@ class ScannerEngine:
         # Compile results
         results['vulnerabilities'] = self.vulnerabilities
         results['severity_summary'] = self._calculate_severity_summary()
-        
+
+        # Compliance framework enrichment (Group B)
+        compliance_config = self.config.get('compliance', {})
+        if compliance_config.get('enabled', False):
+            try:
+                from utils.compliance import enrich_vulnerabilities
+                framework_keys = compliance_config.get(
+                    'frameworks', ['pci_dss', 'soc2', 'iso_27001']
+                )
+                enrich_vulnerabilities(self.vulnerabilities, framework_keys)
+                logger.info(f"Compliance enrichment applied: {framework_keys}")
+            except Exception as e:
+                logger.error(f"Compliance enrichment failed: {e}")
+
         # Add pentest state information
         results['pentest_state'] = self.state_manager.get_state_dict()
         

@@ -211,13 +211,72 @@ def _build_cves_sheet(ws, vulnerabilities: List[Dict]) -> None:
             )
 
 
-def _build_compliance_sheet(ws) -> None:
-    """Populate Compliance sheet — header only, body filled by Group B."""
+def _build_compliance_sheet(ws, vulnerabilities: List[Dict]) -> None:
+    """Populate Compliance sheet — body filled when vulns have compliance field."""
     from openpyxl.styles import Font
 
     ws.append(COMPLIANCE_HEADERS)
     for cell in ws[1]:
         cell.font = Font(bold=True)
+
+    for vuln in vulnerabilities:
+        compliance = vuln.get("compliance", {})
+        if not compliance:
+            continue
+        vuln_type = str(vuln.get("type", ""))
+        severity = str(vuln.get("severity", ""))
+        for framework, controls in compliance.items():
+            for ctrl in controls:
+                ws.append(
+                    [
+                        framework,
+                        ctrl.get("control_id", ""),
+                        vuln_type,
+                        severity,
+                        "failing",
+                    ]
+                )
+
+
+def _build_control_summary_sheet(ws, vulnerabilities: List[Dict]) -> None:
+    """Pivot count of vulns per control, sorted by severity max."""
+    from openpyxl.styles import Font
+
+    ws.append(["framework", "control_id", "control_title", "vuln_count", "severity_max"])
+    for cell in ws[1]:
+        cell.font = Font(bold=True)
+
+    severity_rank = {"critical": 4, "high": 3, "medium": 2, "low": 1, "info": 0}
+
+    # (framework, control_id) -> {count, max_sev_rank, max_sev_str, title}
+    pivot: Dict = {}
+    for vuln in vulnerabilities:
+        compliance = vuln.get("compliance", {})
+        if not compliance:
+            continue
+        sev = str(vuln.get("severity", "info")).lower()
+        sev_rank = severity_rank.get(sev, 0)
+        for framework, controls in compliance.items():
+            for ctrl in controls:
+                key = (framework, ctrl.get("control_id", ""))
+                if key not in pivot:
+                    pivot[key] = {
+                        "count": 0,
+                        "max_rank": -1,
+                        "max_sev": "info",
+                        "title": ctrl.get("title", ""),
+                    }
+                pivot[key]["count"] += 1
+                if sev_rank > pivot[key]["max_rank"]:
+                    pivot[key]["max_rank"] = sev_rank
+                    pivot[key]["max_sev"] = sev
+
+    # Sort by max severity rank descending, then by count
+    sorted_rows = sorted(
+        pivot.items(), key=lambda kv: (-kv[1]["max_rank"], -kv[1]["count"])
+    )
+    for (framework, cid), info in sorted_rows:
+        ws.append([framework, cid, info["title"], info["count"], info["max_sev"]])
 
 
 def build_xlsx(results: Dict, output_path: str, interactive: bool = True) -> bool:
@@ -257,7 +316,12 @@ def build_xlsx(results: Dict, output_path: str, interactive: bool = True) -> boo
     _build_cves_sheet(cves_ws, vulnerabilities)
 
     compliance_ws = wb.create_sheet("Compliance")
-    _build_compliance_sheet(compliance_ws)
+    _build_compliance_sheet(compliance_ws, vulnerabilities)
+
+    # Control Summary sheet (Group B) — only if any vuln has compliance data
+    if any(v.get("compliance") for v in vulnerabilities):
+        control_summary_ws = wb.create_sheet("Control Summary")
+        _build_control_summary_sheet(control_summary_ws, vulnerabilities)
 
     try:
         wb.save(output_path)
