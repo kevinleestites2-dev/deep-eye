@@ -22,7 +22,7 @@ if requirements_file.exists():
 
 setup(
     name="deep-eye",
-    version="1.3.0",
+    version="1.4.0",
     author="Deep Eye Security Team",
     author_email="security@deepeye.io",
     description="Advanced AI-Driven Penetration Testing Tool",

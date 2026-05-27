@@ -1,196 +1,164 @@
-# Deep Eye - Project Structure
+# Architecture
+
+## Overview
+
+Deep Eye is a config-driven, multi-threaded penetration testing tool. The scan pipeline flows through distinct phases, each orchestrated by `ScannerEngine`.
+
+## Scan Pipeline
 
 ```
-deep-eye/
-│
-├── deep_eye.py                 # Main entry point
-├── setup.py                    # Installation setup
-├── requirements.txt            # Python dependencies
-├── README.md                   # Project documentation
-├── QUICKSTART.md              # Quick start guide
-├── CONTRIBUTING.md            # Contributing guidelines
-├── CHANGELOG.md               # Version history
-├── LICENSE                    # MIT License
-├── .gitignore                 # Git ignore rules
-├── install.ps1                # Windows installation script
-├── install.sh                 # Linux/Mac installation script
-│
-├── core/                      # Core functionality
-│   ├── __init__.py
-│   ├── scanner_engine.py      # Main scanning orchestrator
-│   ├── ai_payload_generator.py # AI-powered payload generation
-│   ├── vulnerability_scanner.py # Vulnerability detection
-│   └── report_generator.py    # Report creation
-│
-├── ai_providers/              # AI provider integrations
-│   ├── __init__.py
-│   ├── provider_manager.py    # Provider management
-│   ├── openai_provider.py     # OpenAI/GPT-4 integration
-│   ├── openrouter_provider.py # OpenRouter integration
-│   ├── claude_provider.py     # Anthropic Claude integration
-│   ├── grok_provider.py       # xAI Grok integration
-│   └── ollama_provider.py     # OLLAMA local LLM integration
-│
-├── modules/                   # Security testing modules
-│   ├── __init__.py
-│   └── reconnaissance/        # OSINT & enumeration
-│       ├── __init__.py
-│       └── recon_engine.py
-│
-├── utils/                     # Utility functions
-│   ├── __init__.py
-│   ├── logger.py             # Logging utilities
-│   ├── config_loader.py      # Configuration management
-│   ├── http_client.py        # HTTP client with retry logic
-│   └── parser.py             # URL and response parsing
-│
-├── config/                    # Configuration files
-│   └── config.example.yaml   # Example configuration
-│
-├── templates/                 # Report templates
-│   └── (HTML/PDF templates)
-│
-├── examples/                  # Usage examples
-│   └── basic_usage.py        # Basic usage example
-│
-├── logs/                      # Log files (auto-created)
-├── data/                      # Database files (auto-created)
-└── reports/                   # Generated reports (auto-created)
+CLI (deep_eye.py)
+ │
+ ▼
+ScannerEngine.scan()
+ │
+ ├─ 1. INITIALIZATION ─── PentestStateManager setup
+ │
+ ├─ 2. RECONNAISSANCE ─── ReconEngine (DNS, WHOIS, OSINT, tech detection)
+ │
+ ├─ 3. SUBDOMAIN_DISCOVERY ─── SubdomainScanner (CT logs, DNS brute, liveness)
+ │                              [experimental, config-gated]
+ │
+ ├─ 4. CRAWLING ─── ThreadPoolExecutor BFS crawl
+ │                  URL filtering (extensions, patterns, scope)
+ │
+ ├─ 5. VULNERABILITY_SCANNING ─── Per-URL parallel scan:
+ │     │
+ │     ├─ AIPayloadGenerator.generate_payloads(context)
+ │     ├─ VulnerabilityScanner.scan() ─── 45+ checks
+ │     ├─ SmartBrowserTester ─── Playwright/Browser Use AI
+ │     ├─ PluginManager ─── Custom plugins
+ │     ├─ SecretsDetector ─── Response secret scanning
+ │     └─ CVEMatcher.enrich_vulnerability()
+ │
+ ├─ 6. POST-SCAN ENRICHMENT
+ │     ├─ CVERagIndex ─── Semantic CVE search (ChromaDB)
+ │     ├─ ComplianceMapper ─── PCI-DSS/SOC2/ISO 27001
+ │     ├─ AITriage ─── False-positive filtering
+ │     └─ BountyWriter ─── Bug bounty report generation
+ │
+ ├─ 7. REPORTING ─── ReportGenerator (HTML/PDF/JSON/SARIF/JUnit/CSV/XLSX)
+ │
+ └─ 8. NOTIFICATIONS ─── Email/Slack/Discord alerts
 ```
 
-## Module Descriptions
+## Layer Responsibilities
 
-### Core Modules
+### `core/` — Orchestration
 
-#### scanner_engine.py
-- Orchestrates the entire penetration testing process
-- Multi-threaded web crawling
-- URL discovery and management
-- Coordinates vulnerability scanning
-- Manages scan lifecycle
+| File | Role |
+|------|------|
+| `scanner_engine.py` | Main orchestrator. ThreadPoolExecutor crawl + scan. Coordinates all phases. |
+| `vulnerability_scanner.py` | 45+ vulnerability check methods. Each returns standardized result dicts. |
+| `ai_payload_generator.py` | Context-aware payload generation via AI providers. WAF/tech detection, caching. |
+| `report_generator.py` | Multi-format report dispatch. Jinja2 HTML, ReportLab PDF, SARIF, delegates to exports/. |
+| `pentest_state_manager.py` | Phase tracking, live stats, attack progress, time tracking. |
+| `scan_diff.py` | Compare two scan JSONs. URL normalization, identity matching, severity change detection. |
+| `subdomain_scanner.py` | CT log queries, DNS bruteforce, liveness checks. |
+| `plugin_manager.py` | Auto-discovery and loading of plugins from `plugins/` directory. |
 
-#### ai_payload_generator.py
-- Generates intelligent, context-aware payloads
-- Integrates with multiple AI providers
-- CVE-aware payload generation
-- Framework-specific attack vectors
-- Adaptive payload mutation
+### `ai_providers/` — AI Abstraction
 
-#### vulnerability_scanner.py
-- Implements 25+ vulnerability detection methods
-- SQL Injection (Error, Blind, Time-based)
-- XSS (Reflected, Stored, DOM)
-- Command Injection
-- SSRF, XXE, Path Traversal
-- CSRF, Open Redirect
-- Security misconfigurations
+All providers implement: `generate(prompt, **kwargs) -> str`
 
-#### report_generator.py
-- Professional report generation
-- Multiple formats (HTML, PDF, JSON)
-- Executive summaries
-- Severity-based classification
-- Remediation recommendations
+`provider_manager.py` handles: provider selection, failover, retry logic, API key management.
 
-### AI Providers
+Providers: OpenAI, Claude, Grok, OLLAMA, Gemini, OpenRouter, Mistral, Groq, LM Studio, LiteLLM.
 
-#### provider_manager.py
-- Dynamic provider switching
-- Unified interface for all AI providers
-- Failover and retry logic
-- API key management
+### `modules/` — Specialized Testers
 
-#### Individual Providers
-- **OpenAI**: GPT-4o integration
-- **Claude**: Anthropic Claude 3.5 Sonnet
-- **Grok**: xAI Grok Beta
-- **OLLAMA**: Local LLM support
+Each module follows the pattern:
+- Constructor: `__init__(self, http_client, config)`
+- Entry point: `scan(self, url) -> List[Dict]`
+- Returns standardized vulnerability result dicts
 
-### Modules
+**33 modules** organized by capability:
 
-#### reconnaissance/recon_engine.py
-- DNS enumeration
-- WHOIS lookup
-- Subdomain discovery
-- Technology detection
-- SSL certificate analysis
-- Port scanning
+| Category | Modules |
+|----------|---------|
+| Web Vulns | api_security, authentication, business_logic, file_upload, websocket |
+| Injection | nosql_injection, http_smuggling, log4shell, prototype_pollution |
+| Auth/Session | oauth_testing, saml_attacks, captcha_detection, login_replay |
+| Infrastructure | port_scanner, directory_bruteforce, subdomain_takeover, cache_poisoning |
+| Detection | ml_detection, secrets_scanner, secret_scanning, reconnaissance |
+| Advanced | race_condition, mass_assignment, payload_obfuscation |
+| AI-Powered | ai_triage, cve_intelligence, template_engine |
+| Automation | browser_automation, challenge_solver, intercepting_proxy |
+| Collaboration | collaboration, reporting |
 
-### Utilities
+### `utils/` — Shared Infrastructure
 
-#### logger.py
-- Centralized logging
-- File and console output
-- Log rotation
-- Severity levels
+| Component | Role |
+|-----------|------|
+| `http_client.py` | Requests wrapper with retry, proxy, headers, cookies, rate limiting |
+| `config_loader.py` | YAML config loading with defaults and validation |
+| `logger.py` | Loguru-based logging with file rotation |
+| `parser.py` | URL parsing, HTML extraction, form detection, tech fingerprinting |
+| `notification_manager.py` | Email/Slack/Discord dispatch |
+| `scope_manager.py` | Allowed hosts, excluded paths, port filtering |
+| `oast_server.py` | Out-of-band application security testing callbacks |
+| `ai_summary_generator.py` | AI-generated executive summaries |
+| `exports/` | JUnit XML, CSV, XLSX builders |
+| `compliance/` | Framework mapper + JSON control definitions |
 
-#### config_loader.py
-- YAML configuration management
-- Environment variable support
-- Default configurations
-- Validation
+## Key Design Patterns
 
-#### http_client.py
-- Robust HTTP client
-- Automatic retries
-- Proxy support
-- Custom headers/cookies
-- SSL verification
+### Config-Driven Architecture
+Nearly all behavior is controlled via `config/config.yaml`. The CLI provides only target URL override, config path, verbose flag, and diff mode. Modules read their own config sections.
 
-#### parser.py
-- URL parsing and normalization
-- HTML content extraction
-- Form detection
-- Technology fingerprinting
-- Link extraction
-
-## Data Flow
-
-```
-User Input → Scanner Engine → Web Crawler → URL Discovery
-                ↓
-        AI Payload Generator ← AI Provider
-                ↓
-    Vulnerability Scanner → HTTP Client → Target
-                ↓
-        Results Collection
-                ↓
-        Report Generator → Output (HTML/PDF/JSON)
+### Standardized Vulnerability Result
+```python
+{
+    "type": "sql_injection",
+    "severity": "critical",  # critical/high/medium/low/info
+    "url": "https://target.com/page?id=1",
+    "parameter": "id",
+    "payload": "' OR 1=1--",
+    "evidence": "MySQL error in response...",
+    "remediation": "Use parameterized queries",
+    "cve_references": ["CVE-2024-1234"],
+    # Added by enrichment pipeline:
+    "compliance": {"PCI-DSS": [{"control_id": "6.5.1", ...}]},
+    "triage_reason": "...",
+    "false_positive": false,
+    "confidence": 0.95,
+    "bounty_report": "..."
+}
 ```
 
-## Configuration
+### Threading Model
+- `ScannerEngine` uses `ThreadPoolExecutor` (configurable 1-50 threads)
+- Crawling: parallel BFS with URL deduplication
+- Scanning: parallel per-URL vulnerability testing
+- Subdomain scanning: parallel liveness checks
 
-All settings are managed through `config/config.yaml`:
-- AI provider credentials
-- Scanner parameters
-- Vulnerability checks
-- Reconnaissance modules
-- Report settings
-- Logging configuration
+### AI Provider Failover
+`ProviderManager` tries the configured primary provider, falls back to alternatives on failure. Retry with exponential backoff.
 
-## Extending Deep Eye
+### Post-Scan Enrichment Pipeline
+After all URLs are scanned, results pass through:
+1. RAG CVE enrichment (semantic similarity search)
+2. Compliance mapping (control ID lookup)
+3. AI triage (false-positive scoring)
+4. Bounty report generation (per-vuln markdown)
 
-### Adding New Vulnerability Checks
-1. Add check method to `vulnerability_scanner.py`
-2. Register in enabled_checks
-3. Update documentation
+Each step is config-gated and operates in-place on the results list.
 
-### Adding New AI Providers
-1. Create provider class in `ai_providers/`
-2. Implement `generate()` method
-3. Register in `provider_manager.py`
-4. Update configuration
+### Challenge Solving
+When `ChallengeDetector` identifies a Cloudflare/Akamai interstitial, `ChallengeSolver` launches headless Chromium, waits for JS challenge completion, extracts cookies, and injects them into the HTTP client session. Cookies are cached with configurable TTL.
 
-### Adding New Report Formats
-1. Create template in `templates/`
-2. Add generator method in `report_generator.py`
-3. Update CLI options
+## Data Storage
 
-## Best Practices
+| Store | Path | Purpose |
+|-------|------|---------|
+| Scan results DB | `data/deep_eye.db` | SQLAlchemy/SQLite scan history |
+| CVE intelligence | `data/cve_intelligence.db` | NVD/MITRE CVE data, exploits, tech mappings |
+| RAG vector index | `data/rag_index/` | ChromaDB embeddings for CVE semantic search |
+| Reports | `reports/` | Generated output (HTML, PDF, JSON, etc.) |
+| Logs | `logs/` | Rotating log files |
 
-- Always activate virtual environment
-- Keep dependencies updated
-- Use configuration files for settings
-- Never commit API keys
-- Test on authorized targets only
-- Follow ethical hacking guidelines
+## Configuration Sections
+
+Full reference: `config/config.example.yaml`
+
+Top-level sections: `ai_providers`, `scanner`, `vulnerability_scanner`, `websocket`, `ml_detection`, `osint`, `payload_obfuscation`, `api_security`, `business_logic`, `authentication`, `file_upload`, `collaboration`, `reconnaissance`, `reporting`, `compliance`, `rag`, `ai_triage`, `bug_bounty`, `captcha`, `login_replay`, `templates`, `challenge_solver`, `intercepting_proxy`, `logging`, `database`, `rate_limiting`, `proxy`, `advanced`, `scope`, `oast`, `passive_mode`, `experimental`, `plugin_manager`, `notifications`, `secrets_scanner`

@@ -78,6 +78,7 @@ class AIProviderManager:
             except Exception as e:
                 logger.warning(f"Failed to initialize OpenRouter provider: {e}")
 
+        
         # Gemini
         if ai_config.get('gemini', {}).get('enabled', False):
             try:
@@ -114,7 +115,6 @@ class AIProviderManager:
             except Exception as e:
                 logger.warning(f"Failed to initialize LiteLLM provider: {e}")
 
-    
     def set_provider(self, provider_name: str) -> bool:
         """
         Set active AI provider.
@@ -135,24 +135,43 @@ class AIProviderManager:
     
     def generate(self, prompt: str, **kwargs) -> str:
         """
-        Generate response from active AI provider.
-        
-        Args:
-            prompt: Input prompt
-            **kwargs: Additional provider-specific arguments
-            
-        Returns:
-            Generated response
+        Generate response with retry and automatic failover.
+
+        Tries active provider first with exponential backoff,
+        then fails over to other available providers.
         """
-        if not self.active_provider:
-            logger.error("No active AI provider")
+        if not self.active_provider and not self.providers:
+            logger.error("No AI providers available")
             return ""
-        
-        try:
-            return self.active_provider.generate(prompt, **kwargs)
-        except Exception as e:
-            logger.error(f"Error generating response: {e}")
-            return ""
+
+        # Try active provider with retries
+        max_retries = 3
+        if self.active_provider:
+            for attempt in range(max_retries):
+                try:
+                    return self.active_provider.generate(prompt, **kwargs)
+                except Exception as e:
+                    wait = 2 ** attempt
+                    logger.warning(f"Provider attempt {attempt + 1}/{max_retries} failed: {e}. Retrying in {wait}s...")
+                    if attempt < max_retries - 1:
+                        import time
+                        time.sleep(wait)
+
+        # Failover to other providers
+        for name, provider in self.providers.items():
+            if provider == self.active_provider:
+                continue
+            try:
+                logger.info(f"Failing over to provider: {name}")
+                result = provider.generate(prompt, **kwargs)
+                self.active_provider = provider
+                logger.info(f"Failover successful. Active provider now: {name}")
+                return result
+            except Exception as e:
+                logger.warning(f"Failover to {name} failed: {e}")
+
+        logger.error("All AI providers failed")
+        return ""
     
     def get_available_providers(self) -> list:
         """Get list of available providers."""

@@ -39,7 +39,7 @@ BANNER = """
 ║  ⠀⠈⠉⠉⠋⠉⠉⠋⠉⠉⠉⠋⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠉⠋⡟⠉⠉⡿⠋⠋⠋⠉⠉⠁  
 ║                                                                               
 ║                  Advanced AI-Driven Penetration Testing Tool                 
-║                      Version 1.3.0 - Code Name (Hestia)                                  ║
+║                      Version 1.4.0 - Code Name (Hanzou)                                  ║
 ╚══════════════════════════════════════════════════════════════════════════════════════════╝
 """
 
@@ -88,7 +88,7 @@ Note: All scan options are configured in config.yaml
     parser.add_argument(
         '--version',
         action='version',
-        version='Deep Eye v1.3.0 (Hestia)',
+        version='Deep Eye v1.4.0 (Hanzou)',
         help='Show version and exit'
     )
     
@@ -97,7 +97,36 @@ Note: All scan options are configured in config.yaml
         action='store_true',
         help='Disable banner display'
     )
-    
+
+    parser.add_argument(
+        '--formats',
+        type=str,
+        default=None,
+        help='Comma-separated report formats (e.g. junit,csv,xlsx). Overrides config.'
+    )
+
+    parser.add_argument(
+        '--diff',
+        nargs=2,
+        metavar=('BASELINE', 'CURRENT'),
+        help='Diff two scan JSON files instead of running a scan'
+    )
+
+    parser.add_argument(
+        '--diff-output',
+        type=str,
+        default=None,
+        help='Output path for diff report (default: reports/diff_<timestamp>.<ext>)'
+    )
+
+    parser.add_argument(
+        '--diff-format',
+        type=str,
+        choices=['html', 'json', 'csv'],
+        default='html',
+        help='Diff report format (default: html)'
+    )
+
     return parser.parse_args()
 
 
@@ -134,16 +163,65 @@ def validate_config(config: Dict, target_url: str) -> bool:
     return True
 
 
+def _run_diff_mode(args) -> int:
+    """Run scan diff between two JSON files. Returns exit code."""
+    from core.scan_diff import diff_scans, load_scan_json
+    from utils.exports.diff_renderer import render_html, render_json, render_csv
+    from datetime import datetime
+
+    baseline_path, current_path = args.diff
+    try:
+        baseline = load_scan_json(baseline_path)
+        current = load_scan_json(current_path)
+    except (FileNotFoundError, json.JSONDecodeError) as e:
+        console.print(f"[bold red]Error:[/bold red] Failed to load scan JSON: {e}")
+        return 2
+
+    diff = diff_scans(baseline, current)
+    summary = diff.get("summary", {})
+
+    # Resolve output path
+    output_path = args.diff_output
+    if not output_path:
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        Path("reports").mkdir(parents=True, exist_ok=True)
+        ext = {"html": "html", "json": "json", "csv": "csv"}[args.diff_format]
+        output_path = f"reports/diff_{timestamp}.{ext}"
+
+    fmt = args.diff_format
+    if fmt == "html":
+        render_html(diff, output_path)
+    elif fmt == "json":
+        render_json(diff, output_path)
+    elif fmt == "csv":
+        render_csv(diff, output_path)
+
+    console.print(f"\n[bold cyan]Scan Diff Summary[/bold cyan]")
+    console.print(f"  Baseline: {baseline_path} ({diff['baseline']['vuln_count']} vulns)")
+    console.print(f"  Current:  {current_path} ({diff['current']['vuln_count']} vulns)")
+    console.print(f"  [bold red]New:[/bold red] {summary.get('new', 0)}")
+    console.print(f"  [bold green]Fixed:[/bold green] {summary.get('fixed', 0)}")
+    console.print(f"  [bold yellow]Severity Changed:[/bold yellow] {summary.get('severity_changed', 0)}")
+    console.print(f"  Unchanged: {summary.get('unchanged', 0)}")
+    console.print(f"  Net Delta: {summary.get('net_delta', 0)}")
+    console.print(f"\n[bold green]✓[/bold green] Diff report saved to: {output_path}")
+    return 0
+
+
 def main():
     """Main execution function."""
     try:
         # Parse arguments
         args = parse_arguments()
-        
+
         # Display banner
         if not args.no_banner:
             display_banner()
-        
+
+        # Diff mode: skip scan, run diff between two JSON files
+        if args.diff:
+            return _run_diff_mode(args)
+
         # Load configuration
         console.print("[bold blue]Loading configuration...[/bold blue]")
         config = ConfigLoader.load(args.config)
@@ -170,6 +248,10 @@ def main():
         cookies = scanner_config.get('cookies', {})
         verbose = args.verbose
         
+        # Experimental features
+        experimental_config = config.get('experimental', {})
+        scan_subdomains = experimental_config.get('enable_subdomain_scanning', False)
+        
         # Initialize AI Provider
         console.print(f"[bold blue]Initializing AI Provider: {ai_provider}[/bold blue]")
         ai_manager = AIProviderManager(config)
@@ -191,13 +273,22 @@ def main():
         
         # Display scan configuration
         scan_mode = 'Full Scan' if full_scan else 'Quick Scan' if quick_scan else 'Standard Scan'
-        scan_info = Panel(
-            f"""[bold]Target:[/bold] {target_url}
+        
+        config_text = f"""[bold]Target:[/bold] {target_url}
 [bold]Depth:[/bold] {depth}
 [bold]Threads:[/bold] {threads}
 [bold]AI Provider:[/bold] {ai_provider}
 [bold]Scan Mode:[/bold] {scan_mode}
-[bold]Reconnaissance:[/bold] {'Enabled' if enable_recon else 'Disabled'}""",
+[bold]Reconnaissance:[/bold] {'Enabled' if enable_recon else 'Disabled'}"""
+        
+        if scan_subdomains:
+            config_text += f"\n[bold]Subdomain Scanning:[/bold] [yellow]Enabled (Experimental)[/yellow]"
+        
+        if experimental_config.get('enable_cve_matching', False):
+            config_text += f"\n[bold]CVE Matching:[/bold] [yellow]Enabled (Experimental)[/yellow]"
+        
+        scan_info = Panel(
+            config_text,
             title="Scan Configuration",
             border_style="green"
         )
@@ -209,7 +300,8 @@ def main():
         results = scanner.scan(
             enable_recon=enable_recon,
             full_scan=full_scan,
-            quick_scan=quick_scan
+            quick_scan=quick_scan,
+            scan_subdomains=scan_subdomains
         )
         
         # Generate report (from config)
@@ -217,31 +309,59 @@ def main():
         if reporting_config.get('enabled', True):
             console.print("\n[bold blue]Generating report...[/bold blue]")
             report_gen = ReportGenerator(config)
-            
+
             # Get output settings from config
             output_dir = reporting_config.get('output_directory', 'reports')
             output_filename = reporting_config.get('output_filename', '')
-            report_format = reporting_config.get('default_format', 'html')
-            
+
+            # Resolve formats: CLI --formats > config formats list > default_format
+            if args.formats:
+                formats = [f.strip() for f in args.formats.split(',') if f.strip()]
+            elif reporting_config.get('formats'):
+                formats = list(reporting_config['formats'])
+            else:
+                formats = [reporting_config.get('default_format', 'html')]
+
             # Create output directory if it doesn't exist
             Path(output_dir).mkdir(parents=True, exist_ok=True)
-            
-            # Generate filename if not specified
-            if not output_filename:
-                from datetime import datetime
-                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
-                domain = Path(target_url).stem.replace(':', '_')
-                output_filename = f"deep_eye_{domain}_{timestamp}.{report_format}"
-            
-            output_path = str(Path(output_dir) / output_filename)
-            
-            report_gen.generate(
-                results=results,
-                output_path=output_path,
-                format=report_format
-            )
-            
-            console.print(f"[bold green]✓[/bold green] Report saved to: {output_path}")
+
+            # Generate stem (without extension) once, reused across formats
+            from datetime import datetime
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            domain = Path(target_url).stem.replace(':', '_')
+
+            if output_filename:
+                # User-specified filename: strip extension, use as stem
+                stem = Path(output_filename).stem
+            else:
+                stem = f"deep_eye_{domain}_{timestamp}"
+
+            # Format → file extension mapping
+            ext_map = {
+                'html': 'html',
+                'pdf': 'pdf',
+                'json': 'json',
+                'sarif': 'sarif.json',
+                'junit': 'junit.xml',
+                'csv': 'csv',
+                'xlsx': 'xlsx',
+            }
+
+            for fmt in formats:
+                ext = ext_map.get(fmt, fmt)
+                output_path = str(Path(output_dir) / f"{stem}.{ext}")
+                try:
+                    report_gen.generate(
+                        results=results,
+                        output_path=output_path,
+                        format=fmt
+                    )
+                    console.print(f"[bold green]✓[/bold green] {fmt.upper()} report saved to: {output_path}")
+                except ValueError as e:
+                    console.print(f"[bold red]✗[/bold red] {fmt}: {e}")
+                except Exception as e:
+                    logger.error(f"Failed to generate {fmt} report: {e}", exc_info=True)
+                    console.print(f"[bold red]✗[/bold red] {fmt}: {e}")
         
         # Display summary
         vuln_count = len(results.get('vulnerabilities', []))
@@ -259,6 +379,15 @@ def main():
             border_style="cyan"
         )
         console.print("\n", summary)
+        
+        # Display experimental features info if enabled
+        if scan_subdomains or experimental_config.get('enable_cve_matching', False):
+            console.print("\n[bold yellow]ℹ️  Experimental Features Active:[/bold yellow]")
+            if scan_subdomains:
+                subdomain_count = results.get('subdomain_scan', {}).get('subdomains_found', 0)
+                console.print(f"  • Subdomain Scanning: {subdomain_count} subdomains discovered and scanned")
+            if experimental_config.get('enable_cve_matching', False):
+                console.print(f"  • CVE Intelligence: Technology-CVE matching enabled")
         
         console.print("\n[bold green]Scan completed successfully![/bold green] 🎉\n")
         

@@ -1,90 +1,48 @@
-<center>
-<img src="./assets/Screenshot 2025-10-20 150312.png" height="400">
-</center>
+<p align="center">
+  <img src="./assets/Screenshot 2025-10-20 150312.png" height="300">
+</p>
 
-# Deep Eye 🔍
+<h1 align="center">Deep Eye</h1>
 
-An advanced AI-driven vulnerability scanner and penetration testing tool that integrates multiple AI providers (OpenAI, Grok, OLLAMA, Claude) with comprehensive security testing modules for automated bug hunting, intelligent payload generation, and professional reporting.
+<p align="center">
+  Advanced AI-Driven Penetration Testing Tool
+</p>
 
-![License](https://img.shields.io/badge/license-MIT-green)
-![Status](https://img.shields.io/badge/status-active-success)
+<p align="center">
+  <img src="https://img.shields.io/badge/version-1.4.0-blue" alt="Version">
+  <img src="https://img.shields.io/badge/python-3.8+-green" alt="Python">
+  <img src="https://img.shields.io/badge/license-MIT-green" alt="License">
+  <img src="https://img.shields.io/badge/code_name-Hanzou-purple" alt="Code Name">
+</p>
 
-## 🚀 Features
+---
 
-### Core Capabilities
-- **Multi-AI Provider Support**: Dynamic switching between OpenAI, Grok, OLLAMA, and Claude
-- **Intelligent Payload Generation**: AI-powered, CVE-aware, context-sensitive payloads
-- **Comprehensive Scanning**: 45+ attack methods with framework-specific tests
-- **Advanced Reconnaissance**: Passive OSINT, DNS enumeration, subdomain discovery
-- **Professional Reporting**: PDF/HTML/JSON reports with OSINT intelligence and executive summaries
-- **Collaborative Scanning**: Team-based distributed scanning with session management
-- **Custom Plugin System**: Extend Deep Eye with your own vulnerability scanners
-- **Multi-Channel Notifications**: Real-time alerts via Email, Slack, and Discord
+Deep Eye orchestrates multiple AI providers (OpenAI, Claude, Grok, Gemini, OLLAMA, Groq, Mistral, OpenRouter, LiteLLM, LM Studio) for intelligent payload generation, scans targets for 45+ vulnerability types, and produces professional reports with compliance mapping.
 
-### Vulnerability Detection
+## Features
 
-#### Core Vulnerabilities
-- SQL Injection (Error-based, Blind, Time-based)
-- Cross-Site Scripting (XSS)
-- Command Injection
-- SSRF (Server-Side Request Forgery)
-- XXE (XML External Entity)
-- Path Traversal
-- CSRF (Cross-Site Request Forgery)
-- Open Redirect
-- CORS Misconfiguration
-- Security Headers Analysis
+- **Multi-AI Provider Support** — Dynamic switching and failover across 10 AI providers
+- **45+ Vulnerability Scanners** — SQLi, XSS, SSRF, XXE, SSTI, RCE, deserialization, JWT, OAuth, and more
+- **Context-Aware Payloads** — WAF detection, tech stack fingerprinting, database-specific injection
+- **CVE Intelligence** — RAG-indexed CVE database with real exploit patterns from NVD/MITRE/Exploit-DB
+- **AI Triage** — Automated false-positive filtering and bug bounty report generation
+- **Nuclei-Style Templates** — YAML-based custom vulnerability templates with matchers/extractors
+- **Browser Automation** — Playwright + Browser Use AI for client-side testing
+- **Challenge Bypass** — Cloudflare/Akamai challenge solver with cookie persistence
+- **Intercepting Proxy** — mitmproxy-based traffic interception and modification
+- **Compliance Mapping** — PCI-DSS v4, SOC2 CC, ISO 27001:2022 framework mapping
+- **Export Formats** — HTML, PDF, JSON, JUnit XML, CSV, XLSX
+- **Scan Diffing** — Compare scans to track new/fixed vulnerabilities over time
+- **Collaborative Scanning** — Team-based distributed scanning with session management
+- **Notifications** — Real-time alerts via Email, Slack, Discord
 
-#### v1.3.0 Additional Vulnerabilities
-- Local File Inclusion (LFI)
-- Remote File Inclusion (RFI)
-- Server-Side Template Injection (SSTI)
-- CRLF Injection
-- Host Header Injection
-- LDAP Injection
-- XML Injection
-- Insecure Deserialization
-- Authentication Bypass
-- Information Disclosure
-- Sensitive Data Exposure
-- JWT Vulnerabilities
-- Broken Authentication
+## Requirements
 
-#### v1.1.0 Advanced Modules
-- **API Security Testing** (OWASP API Top 10 2023)
-- **GraphQL Security** (Introspection, Depth limits, Batch attacks)
-- **Business Logic Flaws** (Price manipulation, Workflow bypass, Race conditions)
-- **Authentication Testing** (Session management, JWT, OAuth, MFA bypass)
-- **File Upload Vulnerabilities** (Unrestricted upload, Path traversal, Type bypass)
-- **Collaborative Scanning** (Team-based distributed scanning)
+- Python 3.8+
+- At least one AI provider API key (or local OLLAMA)
+- Playwright (optional, for browser-based testing)
 
-#### v1.2.0 Advanced Modules
-- **WebSocket Testing** (Origin validation, Auth, Injection, DoS protection)
-- **ML-Based Anomaly Detection** (Behavioral analysis, Pattern recognition)
-- **Interactive HTML Reports** (Charts, Filtering, Real-time search)
-- **Enhanced OSINT** (Google dorking, Breach databases, CT logs, GitHub/Pastebin)
-- **Advanced Payload Obfuscation** (11+ techniques for WAF bypass)
-
-#### v1.3.0 New Features
-- **Custom Plugin System** (Extend with your own scanners)
-- **Multi-Channel Notifications** (Email, Slack, Discord alerts)
-- **Enhanced OSINT Reporting** (Reconnaissance data in all reports)
-
-And 17+ more attack vectors
-
-## 📋 Prerequisites
-
-- Python 3.8 or higher
-- pip package manager
-- API keys for AI providers (at least one):
-  - OpenAI API Key
-  - Anthropic (Claude) API Key
-  - Grok API Key
-  - OLLAMA (local installation)
-
-## 🔧 Installation
-
-### Quick Install (Recommended)
+## Installation
 
 **Windows:**
 ```powershell
@@ -93,164 +51,287 @@ And 17+ more attack vectors
 
 **Linux/Mac:**
 ```bash
-chmod +x scripts/install.sh
-./scripts/install.sh
+chmod +x scripts/install.sh && ./scripts/install.sh
 ```
 
-### Manual Installation
-
-1. Clone the repository:
-```bash
-git clone https://github.com/zakirkun/deep-eye.git
-cd deep-eye
-```
-
-2. Install dependencies:
+**Manual:**
 ```bash
 pip install -r requirements.txt
-```
-
-3. Configure AI providers:
-```bash
 cp config/config.example.yaml config/config.yaml
 # Edit config.yaml with your API keys
 ```
 
-## 🎯 Usage
-
-### Quick Start
+**Browser automation (optional):**
 ```bash
-# Scan with target from CLI
-python deep_eye.py -u https://example.com
-
-# Scan with configuration file
-python deep_eye.py -c myconfig.yaml
-
-# Verbose mode
-python deep_eye.py -u https://example.com -v
+pip install playwright && playwright install chromium
 ```
 
-### Configuration-Driven Scanning
-All scan options are configured in `config/config.yaml`:
+## Usage
+
+### Basic Scan
+
+```bash
+python deep_eye.py -u https://target.com
+```
+
+### With Configuration File
+
+```bash
+python deep_eye.py -c config/config.yaml
+```
+
+### Verbose Output
+
+```bash
+python deep_eye.py -u https://target.com -v
+```
+
+### Export in Multiple Formats
+
+```bash
+python deep_eye.py -u https://target.com --formats junit,csv,xlsx
+```
+
+### Scan Diffing
+
+Compare two scan results to see what changed:
+
+```bash
+python deep_eye.py --diff baseline.json current.json --diff-format html --diff-output diff_report.html
+```
+
+### CLI Reference
+
+| Flag | Description |
+|------|-------------|
+| `-u, --url` | Target URL (overrides config) |
+| `-c, --config` | Config file path (default: `config/config.yaml`) |
+| `-v, --verbose` | Verbose output |
+| `--version` | Show version |
+| `--no-banner` | Disable ASCII banner |
+| `--formats` | Comma-separated export formats: `junit,csv,xlsx` |
+| `--diff` | Diff two scan JSON files (positional: BASELINE CURRENT) |
+| `--diff-output` | Output path for diff report |
+| `--diff-format` | Diff format: `html`, `json`, `csv` |
+
+## Configuration
+
+All behavior is controlled via `config/config.yaml`. The CLI is intentionally minimal.
+
+### AI Providers
+
+Configure one or more providers:
+
+```yaml
+ai_providers:
+  openai:
+    enabled: true
+    api_key: "sk-..."
+    model: "gpt-4o"
+  claude:
+    enabled: true
+    api_key: "sk-ant-..."
+    model: "claude-3-5-sonnet-20241022"
+  ollama:
+    enabled: true
+    base_url: "http://localhost:11434"
+    model: "llama2"
+```
+
+Supported: `openai`, `claude`, `grok`, `ollama`, `gemini`, `openrouter`, `mistral`, `groq`, `lmstudio`, `litellm`
+
+### Scanner Settings
 
 ```yaml
 scanner:
-  target_url: "https://example.com"  # Default target
-  ai_provider: "openai"               # AI provider
-  default_depth: 2                    # Crawl depth
-  default_threads: 5                  # Thread count
-  enable_recon: true                  # Enable reconnaissance
-  full_scan: false                    # Full/quick scan mode
-  proxy: ""                           # Proxy settings
-  custom_headers: {}                  # Custom headers
+  target_url: "https://target.com"
+  default_threads: 5          # 1-50
+  default_depth: 2            # crawl depth
+  enable_recon: true
+  full_scan: false
+  ai_provider: "openai"
+```
 
+### Vulnerability Checks
+
+```yaml
+vulnerability_scanner:
+  enabled_checks:
+    - sql_injection
+    - xss
+    - command_injection
+    - ssrf
+    - ssti
+    - lfi
+    - rfi
+    - jwt_vulnerabilities
+    # ... 45+ available checks
+  payload_generation:
+    use_ai: true
+    context_aware: true
+    cve_database: true
+```
+
+### Compliance Mapping
+
+```yaml
+compliance:
+  enabled: true
+  frameworks:
+    - pci_dss
+    - soc2
+    - iso_27001
+```
+
+### AI Triage
+
+```yaml
+ai_triage:
+  enabled: true
+  drop_false_positives: true
+  drop_threshold: 0.8
+  min_severity: "low"
+
+bug_bounty:
+  enabled: true
+  format: "markdown"
+  min_severity: "medium"
+  output_directory: "reports/bounty"
+```
+
+### Nuclei-Style Templates
+
+```yaml
+templates:
+  enabled: true
+  template_directories:
+    - "templates/nuclei"
+  tag_filters:
+    - "cve"
+    - "rce"
+  severity_filter: "critical,high"
+```
+
+### Challenge Solver
+
+```yaml
+challenge_solver:
+  enabled: true
+  vendors:
+    - "cloudflare"
+    - "akamai"
+  playwright_headless: true
+  cookie_ttl_seconds: 1800
+```
+
+### Reporting
+
+```yaml
 reporting:
-  enabled: true                       # Auto-generate reports
-  output_directory: "reports"         # Report directory
-  default_format: "html"              # Report format
+  enabled: true
+  output_directory: "reports"
+  default_format: "html"
+  formats:
+    - html
+    - pdf
+    - json
+    - junit
+    - csv
+    - xlsx
 ```
 
-Then run:
+### Experimental Features
+
+```yaml
+experimental:
+  enable_cve_matching: true
+  enable_subdomain_scanning: true
+  max_subdomains_to_scan: 50
+```
+
+## Scripts
+
 ```bash
-python deep_eye.py
+# Update CVE intelligence database from NVD
+python scripts/update_cve_database.py
+
+# Build RAG vector index for CVE search
+python scripts/build_cve_rag_index.py
 ```
 
-### Command Line Options (Minimal)
-```
--u, --url              Target URL (overrides config)
--c, --config           Configuration file path (default: config/config.yaml)
--v, --verbose          Enable verbose output
---version              Show version and exit
---no-banner            Disable banner display
+## Testing
+
+```bash
+# Run all tests
+pytest
+
+# Run specific test
+pytest tests/test_export_formats.py -v
+
+# E2E test (requires API key)
+python tests/e2e_litellm.py
 ```
 
-**Note:** All scanning options (depth, threads, AI provider, scan mode, proxy, etc.) are now configured in `config.yaml` for better management and repeatability.
-
-## 📁 Project Structure
+## Project Structure
 
 ```
 deep-eye/
-├── core/                      # Core scanning engine
-├── ai_providers/              # AI provider integrations
-├── modules/                   # Security testing modules
-├── utils/                     # Utility functions
-├── config/                    # Configuration files
-├── templates/                 # Report templates
-├── examples/                  # Usage examples
-├── scripts/                   # Installation scripts
-├── docs/                      # Documentation
-├── deep_eye.py               # Main entry point
-├── setup.py                  # Package setup
-└── requirements.txt          # Dependencies
+├── deep_eye.py              # Entry point
+├── core/                    # Orchestration layer
+│   ├── scanner_engine.py    # Main scan orchestrator (ThreadPoolExecutor)
+│   ├── vulnerability_scanner.py  # 45+ vuln checks
+│   ├── ai_payload_generator.py   # AI-powered payload gen
+│   ├── report_generator.py       # PDF/HTML/JSON reports
+│   ├── scan_diff.py              # Scan comparison
+│   └── pentest_state_manager.py  # Phase/progress tracking
+├── ai_providers/            # 10 AI provider integrations
+├── modules/                 # Specialized security testers
+│   ├── ai_triage/           # False-positive filtering + bounty writer
+│   ├── template_engine/     # Nuclei-style YAML templates
+│   ├── challenge_solver/    # CF/Akamai challenge bypass
+│   ├── intercepting_proxy/  # mitmproxy interceptor
+│   ├── captcha_detection/   # CAPTCHA detect + login replay
+│   ├── cve_intelligence/    # CVE scraper + RAG index
+│   ├── browser_automation/  # Playwright + Browser Use AI
+│   └── ...                  # 25+ more modules
+├── utils/
+│   ├── exports/             # JUnit, CSV, XLSX builders
+│   ├── compliance/          # PCI-DSS, SOC2, ISO 27001 mapping
+│   └── ...                  # http_client, logger, parser, etc.
+├── config/
+│   └── config.example.yaml  # Full configuration reference
+├── scripts/                 # CVE updater, RAG builder
+├── tests/                   # pytest test suite
+└── reports/                 # Generated output (gitignored)
 ```
 
-For detailed structure, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+## Vulnerability Coverage
 
-## � Troubleshooting
+### Core (v1.0+)
+SQL Injection (error/blind/time-based), XSS (reflected/stored/DOM), Command Injection, SSRF, XXE, Path Traversal, CSRF, Open Redirect, CORS Misconfiguration, Security Headers
 
-### PDF Report Generation
+### Extended (v1.1-1.3)
+API Security (OWASP API Top 10), GraphQL, Business Logic, Authentication/Session, File Upload, WebSocket, ML Anomaly Detection, OSINT, Payload Obfuscation, LFI/RFI, SSTI, CRLF, Host Header Injection, LDAP Injection, Insecure Deserialization, JWT, Broken Auth
 
-**Issue**: PDF generation errors on Windows (WeasyPrint library issues)
+### Advanced (v1.4+)
+NoSQL Injection, HTTP Smuggling, Race Conditions, Log4Shell, Mass Assignment, Prototype Pollution, OAuth, Cache Poisoning, Subdomain Takeover, SAML Attacks, Port Scanning, Directory Bruteforce, Secret Scanning
 
-**Solution**: The tool now uses ReportLab (Windows-friendly) for PDF generation by default. If you encounter any issues:
+## Legal Disclaimer
 
-1. Ensure ReportLab is installed:
-```bash
-pip install reportlab>=4.0.0
-```
+Deep Eye is designed for **authorized security testing only**.
 
-2. If PDF generation fails, the tool will automatically fall back to HTML format.
-
-3. For advanced HTML-to-PDF conversion (optional), you can install additional tools, but it's not required.
-
-### Common Issues
-
-**AI Provider Connection Errors**
-- Verify your API keys in `config/config.yaml`
-- Check your internet connection
-- Ensure API key has sufficient credits
-
-**Scanning Errors**
-- Verify target URL is accessible
-- Check if target has rate limiting or WAF
-- Try reducing thread count with `-t` option
-
-## �🛡️ Legal Disclaimer
-
-**IMPORTANT**: Deep Eye is designed for authorized security testing only.
-
-- Only use on systems you own or have explicit permission to test
+- Only use on systems you own or have explicit written permission to test
 - Unauthorized access to computer systems is illegal
 - Users are responsible for complying with all applicable laws
 - The developers assume no liability for misuse
 
-## 🤝 Contributing
+## License
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+MIT License. See [LICENSE](LICENSE) for details.
 
-## 📄 License
+## Links
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## � Documentation
-
-- **[Quick Start Guide](docs/QUICKSTART.md)** - Get started quickly
-- **[Architecture](docs/ARCHITECTURE.md)** - System design and structure
-- **[Testing Guide](docs/TESTING_GUIDE.md)** - Testing procedures
-- **[Contributing](docs/CONTRIBUTING.md)** - How to contribute
-- **[Changelog](docs/CHANGELOG.md)** - Version history
-
-## �🙏 Acknowledgments
-
-- OpenAI for GPT models
-- Anthropic for Claude
-- OWASP for security testing methodologies
-- The security research community
-
-## 📧 Contact
-
-For questions or support, please open an issue on GitHub.
-
----
-
-**⚠️ Use Responsibly | 🔒 Test Ethically | 💡 Learn Continuously**
+- [Quick Start Guide](docs/QUICKSTART.md)
+- [Architecture](docs/ARCHITECTURE.md)
+- [Changelog](CHANGELOG.md)
+- [Issues](https://github.com/zakirkun/deep-eye/issues)

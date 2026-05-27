@@ -1,45 +1,21 @@
-# Deep Eye Quick Start Guide
+# Quick Start Guide
 
 ## Installation
 
-1. **Install Python Dependencies:**
-```powershell
+### 1. Install Dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-2. **Configure AI Providers:**
-```powershell
-# Copy example config
-Copy-Item config\config.example.yaml config\config.yaml
+### 2. Configure
 
-# Edit config.yaml and add your API keys
-notepad config\config.yaml
+```bash
+cp config/config.example.yaml config/config.yaml
 ```
 
-## Basic Usage
+Edit `config/config.yaml` and add at least one AI provider API key:
 
-### Simple Scan
-```powershell
-python deep_eye.py -u https://example.com
-```
-
-### Full Scan with AI
-```powershell
-python deep_eye.py -u https://example.com --ai-provider openai --full-scan
-```
-
-### Reconnaissance Mode
-```powershell
-python deep_eye.py -u https://example.com --recon --output report.html
-```
-
-## Configuration
-
-### AI Providers Setup
-
-#### OpenAI (GPT-4)
-1. Get API key from https://platform.openai.com/api-keys
-2. Add to config.yaml:
 ```yaml
 ai_providers:
   openai:
@@ -48,31 +24,89 @@ ai_providers:
     model: "gpt-4o"
 ```
 
-#### Claude (Anthropic)
-1. Get API key from https://console.anthropic.com/
-2. Add to config.yaml:
+### 3. Browser Automation (Optional)
+
+```bash
+pip install playwright && playwright install chromium
+```
+
+Required for: DOM XSS testing, clickjacking detection, challenge solving, hidden element discovery.
+
+## Running a Scan
+
+### Minimal
+
+```bash
+python deep_eye.py -u https://target.com
+```
+
+### From Config (recommended)
+
+Set `scanner.target_url` in config.yaml, then:
+
+```bash
+python deep_eye.py
+```
+
+### Verbose
+
+```bash
+python deep_eye.py -u https://target.com -v
+```
+
+## CLI Reference
+
+| Flag | Description |
+|------|-------------|
+| `-u, --url` | Target URL (overrides config) |
+| `-c, --config` | Config file path (default: `config/config.yaml`) |
+| `-v, --verbose` | Verbose output |
+| `--version` | Show version |
+| `--no-banner` | Disable ASCII banner |
+| `--formats` | Export formats: `junit,csv,xlsx` (comma-separated) |
+| `--diff` | Diff two scan JSONs: `--diff baseline.json current.json` |
+| `--diff-output` | Output path for diff report |
+| `--diff-format` | Diff format: `html`, `json`, `csv` |
+
+## AI Provider Setup
+
+### OpenAI
+```yaml
+ai_providers:
+  openai:
+    enabled: true
+    api_key: "sk-..."
+    model: "gpt-4o"
+```
+
+### Claude (Anthropic)
 ```yaml
 ai_providers:
   claude:
     enabled: true
-    api_key: "sk-ant-your-key-here"
+    api_key: "sk-ant-..."
     model: "claude-3-5-sonnet-20241022"
 ```
 
-#### Grok (xAI)
-1. Get API key from https://console.x.ai/
-2. Add to config.yaml:
+### Grok (xAI)
 ```yaml
 ai_providers:
   grok:
     enabled: true
-    api_key: "xai-your-key-here"
+    api_key: "xai-..."
+    model: "grok-beta"
 ```
 
-#### OLLAMA (Local)
-1. Install OLLAMA from https://ollama.ai/
-2. Pull a model: `ollama pull llama2`
-3. Add to config.yaml:
+### Google Gemini
+```yaml
+ai_providers:
+  gemini:
+    enabled: true
+    api_key: "..."
+    model: "gemini-1.5-flash"
+```
+
+### OLLAMA (Local)
 ```yaml
 ai_providers:
   ollama:
@@ -81,86 +115,272 @@ ai_providers:
     model: "llama2"
 ```
 
-#### OpenRouter
-1. Get API key from https://openrouter.ai/settings/keys
-2. Add to config.yaml:
+### OpenRouter
 ```yaml
 ai_providers:
   openrouter:
     enabled: true
-    api_key: "sk-your-key-here"
+    api_key: "sk-..."
     model: "openai/gpt-4o"
 ```
 
-## Command Line Options
-
-| Option | Description | Example |
-|--------|-------------|---------|
-| `-u, --url` | Target URL | `-u https://example.com` |
-| `-d, --depth` | Crawl depth | `-d 3` |
-| `-t, --threads` | Number of threads | `-t 10` |
-| `--ai-provider` | AI provider | `--ai-provider openai` |
-| `--recon` | Enable reconnaissance | `--recon` |
-| `--full-scan` | Enable all tests | `--full-scan` |
-| `--quick-scan` | Quick scan only | `--quick-scan` |
-| `-o, --output` | Output file | `-o report.pdf` |
-| `--format` | Report format | `--format html` |
-| `--proxy` | Proxy URL | `--proxy http://127.0.0.1:8080` |
-
-## Examples
-
-### 1. Basic Website Scan
-```powershell
-python deep_eye.py -u https://testsite.com
+### LiteLLM (Universal Proxy)
+```yaml
+ai_providers:
+  litellm:
+    enabled: true
+    api_key: "..."
+    model: "gpt-4o"
+    base_url: "http://localhost:4000"
 ```
 
-### 2. Deep Scan with Custom Depth
-```powershell
-python deep_eye.py -u https://testsite.com -d 5 -t 15
+## Common Configurations
+
+### Quick Scan (main URL only)
+
+```yaml
+scanner:
+  quick_scan: true
+  default_threads: 5
 ```
 
-### 3. Full Reconnaissance + Scan
-```powershell
-python deep_eye.py -u https://testsite.com --recon --full-scan --format pdf -o full_report.pdf
+### Full Deep Scan
+
+```yaml
+scanner:
+  full_scan: true
+  default_depth: 5
+  default_threads: 10
+  enable_recon: true
+
+vulnerability_scanner:
+  payload_generation:
+    use_ai: true
+    context_aware: true
+    cve_database: true
 ```
 
-### 4. Scan Through Proxy
-```powershell
-python deep_eye.py -u https://testsite.com --proxy http://127.0.0.1:8080
+### With Compliance Reporting
+
+```yaml
+compliance:
+  enabled: true
+  frameworks:
+    - pci_dss
+    - soc2
+    - iso_27001
+
+reporting:
+  formats:
+    - html
+    - xlsx
+    - junit
 ```
 
-### 5. Using Different AI Provider
-```powershell
-python deep_eye.py -u https://testsite.com --ai-provider claude --full-scan
+### With AI Triage (reduce false positives)
+
+```yaml
+ai_triage:
+  enabled: true
+  drop_false_positives: true
+  drop_threshold: 0.8
+
+bug_bounty:
+  enabled: true
+  format: "markdown"
+  output_directory: "reports/bounty"
+```
+
+### With Challenge Bypass
+
+```yaml
+challenge_solver:
+  enabled: true
+  vendors:
+    - "cloudflare"
+    - "akamai"
+  playwright_headless: true
+  cookie_ttl_seconds: 1800
+```
+
+### Through Proxy
+
+```yaml
+proxy:
+  enabled: true
+  http: "http://127.0.0.1:8080"
+  https: "http://127.0.0.1:8080"
+```
+
+### With Intercepting Proxy (mitmproxy)
+
+```yaml
+intercepting_proxy:
+  enabled: true
+  bind_host: "127.0.0.1"
+  proxy_port: 8080
+  mitmweb_port: 8081
+```
+
+Requires `mitmproxy` installed: `pip install mitmproxy`
+
+## Scan Diffing
+
+Compare two scans to track remediation progress:
+
+```bash
+# Run baseline scan (results saved as JSON)
+python deep_eye.py -u https://target.com
+
+# Later, run another scan
+python deep_eye.py -u https://target.com
+
+# Compare
+python deep_eye.py --diff reports/scan_baseline.json reports/scan_current.json \
+  --diff-format html --diff-output reports/diff.html
+```
+
+Output shows: new vulnerabilities, fixed vulnerabilities, unchanged, severity changes.
+
+## CVE Intelligence (Experimental)
+
+### Build the Database
+
+```bash
+python scripts/update_cve_database.py
+```
+
+### Build RAG Index
+
+```bash
+python scripts/build_cve_rag_index.py
+```
+
+### Enable
+
+```yaml
+experimental:
+  enable_cve_matching: true
+  cve_database_path: "data/cve_intelligence.db"
+
+rag:
+  enabled: true
+  index_path: "data/rag_index"
+  top_k: 5
+  min_score: 0.7
+```
+
+## Subdomain Scanning (Experimental)
+
+```yaml
+experimental:
+  enable_subdomain_scanning: true
+  max_subdomains_to_scan: 50
+```
+
+Discovery methods: Certificate Transparency (crt.sh), DNS bruteforce (100+ patterns), liveness verification.
+
+## Custom Templates (Nuclei-Style)
+
+Create YAML templates for custom checks:
+
+```yaml
+# templates/custom/my-check.yaml
+id: my-custom-check
+info:
+  name: Custom Header Check
+  severity: medium
+  description: Checks for missing security header
+  tags:
+    - headers
+
+http:
+  - method: GET
+    path:
+      - "{{BaseURL}}/"
+    matchers:
+      - type: word
+        words:
+          - "X-Custom-Header"
+        negative: true
+        part: header
+```
+
+Enable:
+
+```yaml
+templates:
+  enabled: true
+  template_directories:
+    - "templates/custom"
+```
+
+## Notifications
+
+```yaml
+notifications:
+  enabled: true
+  notify_on_critical: true
+  slack:
+    enabled: true
+    webhook_url: "https://hooks.slack.com/services/..."
+  discord:
+    enabled: true
+    webhook_url: "https://discord.com/api/webhooks/..."
+  email:
+    enabled: true
+    smtp_host: "smtp.gmail.com"
+    smtp_port: 587
+    username: "..."
+    password: "..."
+    recipients:
+      - "security@company.com"
 ```
 
 ## Troubleshooting
 
+### AI Provider Errors
+- Verify API keys in config.yaml
+- Check API credit balance
+
+### PDF Generation Fails
+- Uses ReportLab (Windows-friendly). Falls back to HTML automatically.
+- Verify: `pip install reportlab>=4.0.0`
+
+### Browser Tests Fail
+```bash
+playwright install chromium --force
+```
+
 ### Import Errors
-Install missing dependencies:
-```powershell
+```bash
 pip install -r requirements.txt --upgrade
 ```
 
-### AI Provider Errors
-- Check API keys in `config/config.yaml`
-- Verify API key has sufficient credits
-- Check network connectivity
-
-### SSL Errors
-Disable SSL verification (not recommended for production):
-Edit config.yaml:
+### Rate Limiting / WAF Blocking
 ```yaml
+rate_limiting:
+  requests_per_second: 2
+  delay_on_error: 5
+
 scanner:
-  verify_ssl: false
+  default_threads: 2
 ```
+
+## Output Formats
+
+Reports saved to `reports/` by default:
+
+| Format | File | Use Case |
+|--------|------|----------|
+| HTML | `*.html` | Interactive viewing with charts/filtering |
+| PDF | `*.pdf` | Executive reporting |
+| JSON | `*.json` | Programmatic access, scan diffing |
+| JUnit XML | `*.xml` | CI/CD pipeline integration |
+| CSV | `*.csv` | Spreadsheet analysis |
+| XLSX | `*.xlsx` | Multi-sheet workbook with compliance data |
+| SARIF | `*.sarif` | GitHub Code Scanning, Azure DevOps |
 
 ## Legal Notice
 
-⚠️ **IMPORTANT**: Only use Deep Eye on systems you own or have explicit permission to test. Unauthorized security testing is illegal.
-
-## Support
-
-For issues and questions:
-- GitHub Issues: https://github.com/zakirkun/deep-eye/issues
-- Documentation: See README.md
+Only use Deep Eye on systems you own or have explicit written permission to test. Unauthorized security testing is illegal.
