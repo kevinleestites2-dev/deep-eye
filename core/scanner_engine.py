@@ -520,6 +520,37 @@ class ScannerEngine:
         results['vulnerabilities'] = self.vulnerabilities
         results['severity_summary'] = self._calculate_severity_summary()
 
+        # RAG enrichment (Group F) — auto-link findings to similar CVEs
+        rag_config = self.config.get('rag', {})
+        if rag_config.get('enabled', False):
+            try:
+                from modules.cve_intelligence.rag_index import CVERagIndex
+                rag = CVERagIndex(self.config)
+                cve_db_path = self.config.get('cve_intelligence', {}).get(
+                    'database_path', 'data/cve_intelligence.db'
+                )
+                # Auto-rebuild if stale
+                if rag_config.get('auto_rebuild', True) and rag.is_stale(cve_db_path):
+                    rag.build(cve_db_path, interactive=False)
+                    if rag.is_loaded():
+                        rag.save()
+                else:
+                    rag.load()
+
+                if rag.is_loaded():
+                    for vuln in self.vulnerabilities:
+                        query = (
+                            f"{vuln.get('type', '')} {vuln.get('parameter', '')} "
+                            f"{str(vuln.get('evidence', ''))[:200]}"
+                        )
+                        hits = rag.search(query, top_k=3)
+                        if hits and not vuln.get('cve_references'):
+                            vuln['cve_references'] = [h['cve_id'] for h in hits]
+                            vuln['rag_matched'] = True
+                    logger.info("RAG enrichment applied")
+            except Exception as e:
+                logger.error(f"RAG enrichment failed: {e}")
+
         # Compliance framework enrichment (Group B)
         compliance_config = self.config.get('compliance', {})
         if compliance_config.get('enabled', False):
