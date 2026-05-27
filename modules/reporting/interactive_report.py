@@ -463,17 +463,18 @@ class InteractiveReportGenerator:
         """Generate HTML cards for vulnerabilities."""
         if not vulnerabilities:
             return '<div class="vuln-card info"><p>No vulnerabilities found!</p></div>'
-        
+
+        import html
         cards_html = []
-        
+
         for vuln in vulnerabilities:
-            severity = vuln.get('severity', 'info')
-            vuln_type = vuln.get('type', 'Unknown')
-            url = vuln.get('url', 'N/A')
-            description = vuln.get('description', 'No description available')
-            evidence = vuln.get('evidence', 'No evidence available')
-            remediation = vuln.get('remediation', 'No remediation available')
-            
+            severity = html.escape(vuln.get('severity', 'info'))
+            vuln_type = html.escape(vuln.get('type', 'Unknown'))
+            url = html.escape(vuln.get('url', 'N/A'))
+            description = html.escape(vuln.get('description', 'No description available'))
+            evidence = html.escape(vuln.get('evidence', 'No evidence available'))
+            remediation = html.escape(vuln.get('remediation', 'No remediation available'))
+
             card = f'''
             <div class="vuln-card {severity}">
                 <div class="vuln-header">
@@ -487,7 +488,7 @@ class InteractiveReportGenerator:
             </div>
             '''
             cards_html.append(card)
-        
+
         return ''.join(cards_html)
     
     def _calculate_severity_stats(self, vulnerabilities: List[Dict]) -> Dict[str, int]:

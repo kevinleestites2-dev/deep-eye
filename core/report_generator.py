@@ -29,7 +29,7 @@ class ReportGenerator:
         Args:
             results: Scan results
             output_path: Output file path
-            format: Report format (html, pdf, json)
+            format: Report format (html, pdf, json, sarif)
         """
         if format == "json":
             self._generate_json(results, output_path)
@@ -37,6 +37,8 @@ class ReportGenerator:
             self._generate_html(results, output_path)
         elif format == "pdf":
             self._generate_pdf(results, output_path)
+        elif format == "sarif":
+            self._generate_sarif(results, output_path)
         else:
             raise ValueError(f"Unsupported format: {format}")
 
@@ -63,6 +65,86 @@ class ReportGenerator:
             logger.info(f"JSON report generated: {output_path}")
         except Exception as e:
             logger.error(f"Failed to generate JSON report: {e}", exc_info=True)
+
+    def _generate_sarif(self, results: Dict, output_path: str):
+        """Generate SARIF 2.1.0 report for CI/CD integration (GitHub code scanning, Azure DevOps)."""
+        severity_to_level = {
+            'critical': 'error',
+            'high': 'error',
+            'medium': 'warning',
+            'low': 'note',
+            'info': 'note',
+        }
+
+        rules = []
+        sarif_results = []
+        rule_ids = set()
+
+        for vuln in results.get('vulnerabilities', []):
+            vuln_type = vuln.get('type', 'unknown')
+            rule_id = vuln_type.lower().replace(' ', '-').replace('(', '').replace(')', '')
+
+            if rule_id not in rule_ids:
+                rule_ids.add(rule_id)
+                rules.append({
+                    'id': rule_id,
+                    'name': vuln_type,
+                    'shortDescription': {'text': vuln_type},
+                    'fullDescription': {'text': vuln.get('description', vuln_type)},
+                    'defaultConfiguration': {
+                        'level': severity_to_level.get(vuln.get('severity', 'info'), 'note')
+                    },
+                    'helpUri': f'https://owasp.org/www-community/attacks/{rule_id}',
+                })
+
+            sarif_results.append({
+                'ruleId': rule_id,
+                'level': severity_to_level.get(vuln.get('severity', 'info'), 'note'),
+                'message': {
+                    'text': f"{vuln.get('description', vuln_type)}. Evidence: {vuln.get('evidence', 'N/A')}"
+                },
+                'locations': [{
+                    'physicalLocation': {
+                        'artifactLocation': {
+                            'uri': vuln.get('url', ''),
+                            'uriBaseId': 'TARGETROOT',
+                        }
+                    }
+                }],
+                'properties': {
+                    'severity': vuln.get('severity', 'info'),
+                    'parameter': vuln.get('parameter', ''),
+                    'payload': vuln.get('payload', ''),
+                    'remediation': vuln.get('remediation', ''),
+                }
+            })
+
+        sarif = {
+            '$schema': 'https://raw.githubusercontent.com/oasis-tcs/sarif-spec/main/sarif-2.1/schema/sarif-schema-2.1.0.json',
+            'version': '2.1.0',
+            'runs': [{
+                'tool': {
+                    'driver': {
+                        'name': 'Deep Eye',
+                        'version': '1.4.0',
+                        'informationUri': 'https://github.com/zakirkun/deep-eye',
+                        'rules': rules,
+                    }
+                },
+                'results': sarif_results,
+                'invocations': [{
+                    'executionSuccessful': True,
+                    'endTimeUtc': datetime.utcnow().strftime('%Y-%m-%dT%H:%M:%SZ'),
+                }],
+            }]
+        }
+
+        try:
+            with open(output_path, 'w', encoding='utf-8') as f:
+                json.dump(sarif, f, indent=2, ensure_ascii=False)
+            logger.info(f"SARIF report generated: {output_path}")
+        except Exception as e:
+            logger.error(f"Failed to generate SARIF report: {e}", exc_info=True)
 
     def _generate_html(self, results: Dict, output_path: str):
         """Generate HTML report."""

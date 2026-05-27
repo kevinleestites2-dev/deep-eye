@@ -13,6 +13,23 @@ class SecretScanner:
         """Initialize the secret scanner."""
         self.config = config
         self.patterns = self._load_patterns()
+
+        # Whitelist for suppressing false positives
+        secrets_config = config.get('secrets_scanner', {})
+        whitelist_config = secrets_config.get('whitelist', {})
+        self.whitelisted_emails = [e.lower() for e in whitelist_config.get('emails', [])]
+        self.whitelisted_domains = [d.lower() for d in whitelist_config.get('domains', [])]
+
+    def _is_whitelisted(self, value: str) -> bool:
+        """Check if a matched value contains a whitelisted email or domain."""
+        value_lower = value.lower()
+        for email in self.whitelisted_emails:
+            if email in value_lower:
+                return True
+        for domain in self.whitelisted_domains:
+            if f"@{domain}" in value_lower:
+                return True
+        return False
         
     def _load_patterns(self) -> Dict[str, Pattern]:
         """Load regex patterns for secret detection."""
@@ -56,6 +73,10 @@ class SecretScanner:
                 # For generic API keys, the secret is in group 2
                 if name == 'Generic API Key' and match.groups():
                     matched_text = match.group(2)
+
+                # Skip whitelisted emails/domains
+                if self._is_whitelisted(matched_text):
+                    continue
                 
                 # Redact the secret for the report
                 redacted = matched_text[:4] + '*' * (len(matched_text) - 8) + matched_text[-4:] if len(matched_text) > 8 else '***'

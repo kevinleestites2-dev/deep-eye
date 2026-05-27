@@ -181,22 +181,47 @@ python deep_eye.py
 ### Experimental Features (v1.4.0+)
 
 #### 🧬 CVE Intelligence System
-Match detected technologies with real-world CVE exploits:
+Match detected technologies with real-world CVE exploits using advanced scraping from NIST, MITRE, and Exploit-DB:
 
 ```powershell
-# Step 1: Build CVE database
+# Step 1: Build CVE database from NVD
 python scripts/update_cve_database.py
 
-# Step 2: Enable in config.yaml
+# Step 2: Scrape specific CVE with browser automation (Playwright)
+from modules.cve_intelligence.cve_scraper import CVEScraper
+scraper = CVEScraper(use_browser=True)
+
+# Complete CVE data from all sources
+result = scraper.scrape_cve_complete('CVE-2024-1234')
+
+# Bulk scraping with caching (7-day cache)
+scraper.scrape_nvd_cves(days_back=30, limit=1000, use_cache=True)
+
+# Latest vulnerabilities from RSS/JSON feeds
+import asyncio
+latest = asyncio.run(scraper.scrape_latest_vulnerabilities(max_items=100))
+
+# Step 3: Enable in config.yaml
 experimental:
   enable_cve_matching: true
 ```
 
-**Benefits:**
-- 🎯 Real-world exploit payloads from CVE database
-- 🔍 Technology-specific vulnerability testing
-- 📊 8 CVE patterns, 36 exploit payloads, 21 tech mappings
-- 🚀 Prioritizes proven exploits over generic payloads
+**Features:**
+- 🎯 Real CVE data from NIST NVD using Playwright browser automation
+- 🔍 MITRE CVE API integration with async support
+- 💥 Exploit-DB scraping with pagination support
+- 📊 CVE validation and status checking (PUBLISHED/RESERVED/REJECTED)
+- � Enhanced database with CVSS vectors, exploit details, and references
+- 🌐 Async link validation for references
+
+**Data Sources:**
+- **NIST NVD API v2.0**: Detailed CVE information, CVSS scores, and vectors
+- **NVD RSS Feed**: Latest vulnerability announcements (fallback source)
+- **MITRE CVE API**: Vendor, product, version, and problem type data
+- **Exploit-DB**: Real exploit code and proof-of-concepts with pagination
+- **CISA KEV**: Known Exploited Vulnerabilities catalog (JSON)
+- **Vulners API**: Alternative CVE data source with extended metadata
+- **GitHub**: CVE proof-of-concept repository tracking
 
 #### 🌐 Subdomain Discovery & Scanning
 Automatically discover and scan all subdomains:

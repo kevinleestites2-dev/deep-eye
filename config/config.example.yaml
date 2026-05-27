@@ -108,6 +108,7 @@ scanner:
   default_depth: 2
   max_urls: 1000
   timeout: 10
+  scan_url_timeout: 60  # Maximum time to scan a single URL (seconds) - default: 60
   user_agent: "Deep-Eye/1.0 (Security Scanner)"
   follow_redirects: true
   verify_ssl: true
@@ -168,6 +169,15 @@ vulnerability_scanner:
     # v1.2.0 advanced modules
     - websocket
     - anomaly_detector
+    # v1.5.0 new vulnerability classes
+    - nosql_injection
+    - http_smuggling
+    - race_condition
+    - log4shell
+    - oauth_testing
+    - mass_assignment
+    - prototype_pollution
+    - secret_scanning
     # Note: osint_gathering has been moved to reconnaissance phase
   
   # Payload generation
@@ -371,12 +381,63 @@ proxy:
 # Advanced Settings
 advanced:
   # Browser automation for smart testing (requires: pip install playwright && playwright install chromium)
-  enable_javascript_rendering: false  # Enable browser-based XSS, SQLi, DOM XSS testing
+  enable_javascript_rendering: false  # Enable browser-based vulnerability testing
   screenshot_enabled: false  # Capture screenshots as base64 (requires browser automation)
-  custom_dns_servers: []
-  exclude_extensions: [".jpg", ".jpeg", ".png", ".gif", ".css", ".js", ".woff", ".woff2", ".ttf"]
+
+  # Browser testing architecture (v1.4.0+):
+  # - Browser Use AI (requires: pip install browser-use langchain-openai + OpenAI API key)
+  #   Used for: XSS and hidden element discovery (intelligent, context-aware)
+  # - Playwright (requires: pip install playwright && playwright install chromium)
+  #   Used for: SQLi, DOM XSS, clickjacking (deterministic, fast)
+  #
+  # Note: Browser Use AI is experimental and requires more research
+  # Set enable_browser_use_ai to false to use only Playwright (recommended for stability)
+  enable_browser_use_ai: false  # Disable Browser Use AI, use Playwright for all tests (default: false)
+
+  # Browser automation timeouts (to prevent hanging/stuck scanning)
+  browser_timeout: 120  # Maximum time for browser tests per URL (seconds) - default: 120 (2 minutes, reduced from 5)
+  browser_page_timeout: 10  # Page load timeout (seconds) - default: 10 (reduced from 15)
+  browser_navigation_timeout: 10  # Navigation timeout (seconds) - default: 10 (reduced from 15)
+
+  # Stealth / Anti-detection
+  ua_rotation: false  # Rotate User-Agent from a pool of real browser UAs
+  jitter_min: 0.0  # Minimum random delay between requests (seconds)
+  jitter_max: 0.0  # Maximum random delay between requests (seconds, 0 = disabled)
+
+  # Proxy rotation (round-robin through list)
+  proxy_pool: []  # e.g. ["http://proxy1:8080", "socks5://proxy2:1080"]
+
+# Scope Management
+scope:
+  enabled: false
+  allowed_hosts:
+    - "*.example.com"
+    - "target.com"
+  excluded_paths:
+    - "/logout"
+    - "/admin/.*"
+  allowed_ports: [80, 443, 8080, 8443]
+
+# OAST Callback Server (for blind vulnerability detection)
+oast:
+  enabled: false
+  host: "0.0.0.0"
+  port: 9999
+
+# Passive-only mode (no active payloads, read-only scanning)
+passive_mode: false
+
+  # URL filtering (reduces scan time and focuses on relevant targets)
+  exclude_extensions: [".jpg", ".jpeg", ".png", ".gif", ".css", ".js", ".woff", ".woff2", ".ttf", ".svg", ".ico"]
+  # Exclude URLs by regex patterns (e.g., ["/logout", "/admin/.*", ".*\\.pdf$"])
   exclude_patterns: []
-  max_response_size: 5242880  # 5MB
+
+  # Response size limiting (prevents memory issues with large files)
+  max_response_size: 5242880  # 5MB - responses larger than this will be truncated or skipped
+
+  # Custom DNS servers (NOTE: Python requests library uses OS-level DNS, not configurable per-request)
+  # To use custom DNS, configure at OS level or use tools like dnschef/dnsproxy
+  custom_dns_servers: []  # Not implemented - requires OS-level DNS configuration
 
 # Experimental Features (v1.4.0+)
 experimental:
@@ -428,3 +489,117 @@ notifications:
     webhook_url: "https://discord.com/api/webhooks/YOUR/WEBHOOK/URL"
     username: "Deep Eye Scanner"  # Optional: custom bot name
     avatar_url: ""  # Optional: custom avatar URL
+
+# Secrets Scanner (v1.4.0+)
+secrets_scanner:
+  enabled: true  # Scan for leaked credentials and secrets
+
+  # Detection settings
+  scan_response_body: true  # Scan response body for secrets
+  scan_response_headers: true  # Scan response headers
+  scan_javascript_files: true  # Deep scan JavaScript files
+  check_git_exposure: true  # Check for exposed .git files
+
+  # Entropy detection for unknown secrets
+  enable_entropy_detection: true  # Detect high-entropy strings (potential keys)
+  min_entropy: 4.5  # Minimum entropy threshold (0-8, higher = more random)
+  min_length: 20  # Minimum length for entropy detection
+
+  # Pattern categories to scan for
+  enabled_patterns:
+    # Cloud provider keys
+    - aws_access_key
+    - aws_secret_key
+    - gcp_api_key
+    - gcp_service_account
+    - azure_client_secret
+    - azure_storage_key
+
+    # Version control
+    - github_token
+    - github_app_token
+    - gitlab_token
+    - bitbucket_token
+
+    # Communication platforms
+    - slack_token
+    - slack_webhook
+    - discord_webhook
+    - telegram_token
+
+    # Payment processors
+    - stripe_api_key
+    - stripe_restricted_key
+    - paypal_token
+    - square_token
+
+    # Messaging services
+    - twilio_api_key
+    - sendgrid_api_key
+    - mailgun_api_key
+    - mailchimp_api_key
+
+    # Database credentials
+    - database_connection_string
+    - mongodb_uri
+    - redis_uri
+    - postgres_connection
+    - mysql_connection
+
+    # Authentication & Encryption
+    - jwt_token
+    - oauth_token
+    - api_key_generic
+    - private_key_pem
+    - private_key_rsa
+    - password_in_url
+    - basic_auth_header
+
+    # Other services
+    - npm_token
+    - docker_hub_token
+    - heroku_api_key
+    - cloudflare_api_key
+    - datadog_api_key
+
+  # Severity mapping for different secret types
+  severity_mapping:
+    # Critical severity
+    aws_secret_key: critical
+    gcp_service_account: critical
+    azure_storage_key: critical
+    database_connection_string: critical
+    private_key_pem: critical
+    private_key_rsa: critical
+
+    # High severity
+    github_token: high
+    gitlab_token: high
+    stripe_api_key: high
+    jwt_token: high
+    oauth_token: high
+    api_key_generic: high
+
+    # Medium severity
+    slack_webhook: medium
+    discord_webhook: medium
+    sendgrid_api_key: medium
+    mailgun_api_key: medium
+
+    # Default for unlisted types
+    default: high
+
+  # Whitelist - suppress false positives for known-safe values
+  whitelist:
+    # Exact email addresses to ignore (case-insensitive)
+    emails:
+      - "contact@example.com"
+      - "support@example.com"
+      - "info@example.com"
+      - "admin@example.com"
+      - "noreply@example.com"
+
+    # Domain patterns - any email @domain will be ignored (case-insensitive)
+    domains:
+      - "example.com"
+      - "example.org"

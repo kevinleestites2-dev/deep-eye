@@ -297,39 +297,70 @@ class NotificationManager:
         try:
             discord_config = self.notification_config.get('discord', {})
             webhook_url = discord_config.get('webhook_url')
-            
+
             if not webhook_url:
                 logger.warning("Discord webhook URL not configured")
                 return False
-            
+
+            # Get optional custom settings
+            username = discord_config.get('username', 'Deep Eye Scanner')
+            avatar_url = discord_config.get('avatar_url', '')
+
             # Create Discord embed
             embed = {
                 "title": f"{data['title']}: {data['target']}",
+                "description": f"Scan completed for {data['target']}",
                 "color": 5814783,  # Blue color
                 "fields": [
-                    {"name": "Target", "value": data['target'], "inline": True},
-                    {"name": "Duration", "value": data['duration'], "inline": True},
-                    {"name": "URLs Crawled", "value": str(data['urls_crawled']), "inline": True},
-                    {"name": "Total Vulnerabilities", "value": str(data['total_vulnerabilities']), "inline": True},
+                    {"name": "🎯 Target", "value": data['target'], "inline": False},
+                    {"name": "⏱️ Duration", "value": data['duration'], "inline": True},
+                    {"name": "🔗 URLs Crawled", "value": str(data['urls_crawled']), "inline": True},
+                    {"name": "📊 Total Vulnerabilities", "value": str(data['total_vulnerabilities']), "inline": True},
                     {"name": "🔴 Critical", "value": str(data['critical']), "inline": True},
                     {"name": "🟠 High", "value": str(data['high']), "inline": True},
                     {"name": "🟡 Medium", "value": str(data['medium']), "inline": True},
-                    {"name": "🔵 Low", "value": str(data['low']), "inline": True}
+                    {"name": "🔵 Low", "value": str(data['low']), "inline": True},
+                    {"name": "ℹ️ Info", "value": str(data['info']), "inline": True}
                 ],
                 "timestamp": datetime.now().isoformat(),
                 "footer": {"text": "Deep Eye Scanner"}
             }
-            
+
+            # Build message payload
             message = {"embeds": [embed]}
-            
+            if username:
+                message["username"] = username
+            if avatar_url:
+                message["avatar_url"] = avatar_url
+
+            logger.debug(f"Sending Discord notification to: {webhook_url[:50]}...")
+            logger.debug(f"Payload: {json.dumps(message, indent=2)}")
+
             response = requests.post(webhook_url, json=message, timeout=10)
+
+            # Log response details for debugging
+            logger.debug(f"Discord API response status: {response.status_code}")
+            logger.debug(f"Discord API response: {response.text}")
+
             response.raise_for_status()
-            
-            logger.info("Discord notification sent successfully")
+
+            logger.info("✅ Discord notification sent successfully")
             return True
-        
+
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Discord webhook HTTP error: {e}")
+            logger.error(f"Response status: {e.response.status_code if e.response else 'N/A'}")
+            logger.error(f"Response body: {e.response.text if e.response else 'N/A'}")
+            return False
+        except requests.exceptions.Timeout:
+            logger.error("Discord webhook request timed out after 10 seconds")
+            return False
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Discord webhook request error: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Error sending Discord notification: {e}")
+            logger.error(f"Unexpected error sending Discord notification: {e}")
+            logger.exception("Full traceback:")
             return False
     
     def _send_discord_critical(self, data: Dict) -> bool:
@@ -337,34 +368,69 @@ class NotificationManager:
         try:
             discord_config = self.notification_config.get('discord', {})
             webhook_url = discord_config.get('webhook_url')
-            
+
             if not webhook_url:
+                logger.debug("Discord webhook not configured for critical alerts")
                 return False
-            
+
+            # Get optional custom settings
+            username = discord_config.get('username', 'Deep Eye Scanner')
+            avatar_url = discord_config.get('avatar_url', '')
+
+            # Truncate evidence if too long (Discord has limits)
+            evidence = data.get('evidence', '')[:1000]
+
             embed = {
                 "title": "🚨 Critical Vulnerability Detected",
+                "description": f"**{data['vulnerability_type']}** detected on {data['target']}",
                 "color": 16711680,  # Red color
                 "fields": [
-                    {"name": "Type", "value": data['vulnerability_type'], "inline": True},
-                    {"name": "Severity", "value": data['severity'].upper(), "inline": True},
-                    {"name": "Target", "value": data['target'], "inline": False},
-                    {"name": "URL", "value": data['url'], "inline": False},
-                    {"name": "Evidence", "value": f"```{data['evidence'][:1000]}```", "inline": False}
+                    {"name": "🔴 Severity", "value": data['severity'].upper(), "inline": True},
+                    {"name": "🎯 Type", "value": data['vulnerability_type'], "inline": True},
+                    {"name": "🌐 Target", "value": data['target'], "inline": False},
+                    {"name": "🔗 Vulnerable URL", "value": data.get('url', 'N/A')[:1024], "inline": False},  # Discord limit
+                    {"name": "🔍 Evidence", "value": f"```{evidence}```" if evidence else "No evidence provided", "inline": False}
                 ],
                 "timestamp": data['timestamp'],
                 "footer": {"text": "Deep Eye Scanner - Immediate Alert"}
             }
-            
-            message = {"embeds": [embed]}
-            
+
+            # Build message payload
+            message = {
+                "content": f"@here **CRITICAL VULNERABILITY DETECTED!**",  # Mention everyone
+                "embeds": [embed]
+            }
+            if username:
+                message["username"] = username
+            if avatar_url:
+                message["avatar_url"] = avatar_url
+
+            logger.debug(f"Sending critical Discord alert to: {webhook_url[:50]}...")
+
             response = requests.post(webhook_url, json=message, timeout=10)
+
+            logger.debug(f"Discord API response status: {response.status_code}")
+            logger.debug(f"Discord API response: {response.text}")
+
             response.raise_for_status()
-            
-            logger.info("Critical vulnerability alert sent to Discord")
+
+            logger.info("✅ Critical vulnerability alert sent to Discord")
             return True
-        
+
+        except requests.exceptions.HTTPError as e:
+            logger.error(f"Discord critical alert HTTP error: {e}")
+            logger.error(f"Response status: {e.response.status_code if e.response else 'N/A'}")
+            logger.error(f"Response body: {e.response.text if e.response else 'N/A'}")
+            return False
+        except requests.exceptions.Timeout:
+            logger.error("Discord critical alert request timed out")
+            return False
+        except requests.exceptions.RequestException as e:
+            logger.error(f"Discord critical alert request error: {e}")
+            return False
         except Exception as e:
-            logger.error(f"Error sending Discord critical alert: {e}")
+            logger.error(f"Unexpected error sending Discord critical alert: {e}")
+            logger.exception("Full traceback:")
             return False
     
     def _create_email_html(self, data: Dict) -> str:
